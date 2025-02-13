@@ -1,8 +1,15 @@
 ﻿module GrokFP.Ch09
 
+#nowarn "40"
+
 (*
    - F# List module will throw an exception if zipping two lists of different lengths. Seq will drop values from the longest one
      See https://stackoverflow.com/questions/46994189/why-cant-i-zip-two-lists-of-different-lengths for a reasonable explanation
+   - Closest equivalent to the Scala Stream type as used by the book is probably AsyncSeq. 
+     https://fsprojects.github.io/FSharp.Control.AsyncSeq/
+   - Implemented orElse function for AsyncSeq. Since the "else" function used in the example is recursive,
+     it caused infinite recursive calls no matter what and therefore stack overflow. Wrapping it in a function
+     solves the issue. Better suggestions welcome!
 *)
 
 
@@ -14,7 +21,11 @@ open System.Collections.Generic
 // but as long as it can be used to generate numbers it will still illustrate the important points.
 let exchangeRatesTableApiCall(currency: string) : IDictionary<string, decimal> = 
 
-    if Random.Shared.NextDouble() < 0.15 then failwith "Connection error"
+    if Random.Shared.NextDouble() < 0.10
+    then 
+        let msg = "Connection error" 
+        printfn "%s "msg
+        failwith msg
 
     if(currency = "USD")
     then 
@@ -28,12 +39,9 @@ type Currency = Currency of string
 
 let exchangeRatesTable(Currency currency) : Async<Map<Currency, decimal>> = 
     async {
-        do! Async.Sleep(Random.Shared.Next(15, 40)) // simulate latency
-
         return 
             exchangeRatesTableApiCall(currency).AsMap() 
             |> Map.mapKeys Currency // simply wrap the key
-
     }
 
 /// Spoiler alert: I think this recursive function just solves the problem (well other than
@@ -180,8 +188,142 @@ module ValuesOnDemand =
             seq {
                 yield! [ Yellow; Orange; Blue; Green; Black; White]
                 yield! helper // this is where the sequence restarts from the beginning
-                              // compiler will generate a warning, it's safe to ignore or suppress
+                              // compiler will generate a warning, it's safe to ignore or suppress with #nowarn "40"
             }
+
         helper 
+
+module StreamsAsSequenceOfAsyncValues = 
+
+    open FSharp.Control
+    
+    let stream1 = asyncSeq { 1; 2; 3 }
+
+    let stream2 = asyncSeq { 4; 5; 6 }
+
+    let stream3 = AsyncSeq.append stream1 stream2
+
+    let asyncList: Async<int list> = stream3 |> AsyncSeq.toListAsync
+
+    /// This does not work as intended and will blow up the stack.
+    let rec numbers_stack_overflow() = 
+        AsyncSeq.append (asyncSeq { 1; 2; 3 }) (numbers_stack_overflow())
+
+    /// This works as expected. Code is structurally similar to the colorInfiniteSequence function above
+    let rec numbers() = 
+        asyncSeq {
+            yield! asyncSeq { 1; 2; 3 }
+            yield! numbers()
+        }
+    
+    // calling this function will result in stack overflow
+    let eightNumbersStackOverflow() : int list = numbers_stack_overflow() |> AsyncSeq.take 8 |> AsyncSeq.toListSynchronously
+
+    let eightNumbers() : int list = numbers() |> AsyncSeq.take 8 |> AsyncSeq.toListSynchronously
+
+    let castTheDieImpure() = 
+        let value = Random.Shared.Next(0, 6) + 1
+        printfn $"castTheDie: {value}"
+        value
+        
+    let castTheDie() = async { return castTheDieImpure() }
+
+    // the async computation gets re-evaluated for each element of the sequence.
+    let infiniteCastTheDie = AsyncSeq.replicateInfiniteAsync (castTheDie())
+
+    let castNTimes n = infiniteCastTheDie |> AsyncSeq.take n |> AsyncSeq.toListSynchronously
+
+    // Take n elements that satisfy the predicate.
+    let filteredCast pred n = 
+        infiniteCastTheDie 
+        |> AsyncSeq.filter pred 
+        |> AsyncSeq.take n
+        |> AsyncSeq.toListSynchronously
+
+    module PracticingStreamOperations = 
+        
+        let a1_filterOddNumbers() = 
+            castTheDie() 
+            |> AsyncSeq.replicateInfiniteAsync
+            |> AsyncSeq.filter (fun i -> i % 2 = 0)
+            |> AsyncSeq.take 3
+
+        let a2_firstFive() = 
+            castTheDie() 
+            |> AsyncSeq.replicateInfiniteAsync
+            |> AsyncSeq.take 5
+            |> AsyncSeq.map (fun i -> if i = 6 then 12 else i)
+
+        let a3_sum_first_three() = 
+            castTheDie() 
+            |> AsyncSeq.replicateInfiniteAsync
+            |> AsyncSeq.take 3
+            |> AsyncSeq.sum
+
+        let a4_until5_and_two_more() = 
+            asyncSeq {
+                let infSeq = castTheDie() |> AsyncSeq.replicateInfiniteAsync
+                let first5 = 
+                    infSeq
+                    |> AsyncSeq.filter(fun i -> i = 5)
+                    |> AsyncSeq.take 1
+
+                let nextTwo = infSeq |> AsyncSeq.take 2
+
+                yield! first5
+                yield! nextTwo
+            } |> AsyncSeq.toListSynchronously
+        
+        let a5_100_values_then_discard() =
+            castTheDie() 
+            |> AsyncSeq.replicateInfiniteAsync
+            |> AsyncSeq.take 100
+            |> AsyncSeq.iter(fun _ -> ()) // as intended but it's not elegant...
+            //|> AsyncSeq.fold (fun _ _ -> []) [] |> Async.Ignore // alternative (even worse?)
+
+        let a6_first_three_casts_next_three_tripled() = 
+            asyncSeq {
+                let infSeq = castTheDie() |> AsyncSeq.replicateInfiniteAsync
+                let first3 = infSeq |> AsyncSeq.take 3
+                let next = infSeq |> AsyncSeq.take 3 |> AsyncSeq.map (fun i -> i * 3)
+                yield! first3
+                yield! next
+            } |> AsyncSeq.toListSynchronously
+            
+        let a7_cast_until_n_6s_in_a_row n = 
+            (0, castTheDie() |> AsyncSeq.replicateInfiniteAsync) 
+            ||> AsyncSeq.scan (fun sixes current -> if current = 6 then sixes + 1 else 0)
+            |> AsyncSeq.filter ((=) n) // point-free style: concise syntax but hides the name! still readable?
+            |> AsyncSeq.take(1)
+            |> AsyncSeq.toListSynchronously
+            
+module SolvingCurrencyProblemWithStreams = 
+    
+    open FSharp.Control
+
+    let extractSingleCurrencyRate = WorkingBottomUp.extractSingleCurrencyRate
+    let trending = Array.toList >> WorkingBottomUp.trending
+
+    /// Infinite sequence of rates
+    let rates(from: Currency, ``to``: Currency) : AsyncSeq<decimal> = 
+
+        let rec ratesHelper(from: Currency, ``to``: Currency) = //: AsyncSeq<decimal> = 
+            exchangeRatesTable(from)
+            |> AsyncSeq.replicateInfiniteAsync
+            |> AsyncSeq.choose (extractSingleCurrencyRate ``to``)
+            |> AsyncSeq.orElse (fun () -> ratesHelper(from, ``to``)) // fun() wrapper needed here
+            
+        ratesHelper(from, ``to``)
+
+    let exchangeIfTrending(amount: decimal, from: Currency, ``to``: Currency) : AsyncSeq<decimal> = 
+        rates(from, ``to``)
+        |> AsyncSeq.windowed 3
+        |> AsyncSeq.filter trending
+        |> AsyncSeq.map Array.last
+        |> AsyncSeq.take 1
+        |> AsyncSeq.map (fun last -> last * amount)
+
+    
+
 
 

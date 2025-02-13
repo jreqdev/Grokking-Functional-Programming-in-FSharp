@@ -189,6 +189,59 @@ module Async =
         }
         
 
-        
+module AsyncSeq = 
+    
+    open FSharp.Control
 
- 
+    /// Wrapping the alternative sequence in a function
+    /// helps avoid infinite recursion (eager evaluation)
+    let orElse alternativeSeq aSeq = 
+        asyncSeq { 
+            try yield! aSeq
+            with _ -> yield! (alternativeSeq())
+        }       
+
+    ///<summary>Returns a sequence yielding sliding windows containing elements from the input
+    /// sequence. 
+    ///</summary>
+    ///<param name="windowSize">The number of elements in each window.</param>
+    ///<param name="source">The input async sequence.</param>
+    ///<returns>The result async sequence.</returns>
+    let windowed (windowSize: int) (source: AsyncSeq<'T>) : AsyncSeq<'T[]> = 
+        
+        let rec yieldWindow (enumerator: IAsyncEnumerator<'T>) previousWindow = 
+            asyncSeq {
+                let currentWindow = ResizeArray(windowSize)
+
+                // copy contents of the previous window to the current window, skipping first element
+                if previousWindow |> Array.length > 0 
+                then
+                    previousWindow 
+                    |> Array.skip 1
+                    |> Array.iter (fun elem -> currentWindow.Add(elem))
+
+                // read from the sequence as many elements as needed to complete
+                // the current window
+
+                let! read = enumerator.MoveNext()
+                let mutable current = read
+                
+                while current.IsSome do
+                    currentWindow.Add(current.Value)
+                    if(currentWindow.Count = windowSize)
+                    then 
+                        let resultWindow = currentWindow.ToArray()
+                        yield resultWindow
+                        yield! yieldWindow enumerator resultWindow
+                    else 
+                        let! next = enumerator.MoveNext()
+                        current <- next
+            }
+
+        if windowSize < 1 then invalidArg (nameof(windowSize)) "Window size must be greater than zero"
+
+        asyncSeq {
+            use enumerator = source.GetEnumerator()
+            yield! yieldWindow enumerator [| |]
+        }
+        

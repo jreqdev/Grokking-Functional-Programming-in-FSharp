@@ -4,6 +4,7 @@ open System
 open Xunit
 
 open GrokFP.Library
+open FSharp.Control
 
 [<Fact>]
 let ``Result flatten... flattens`` () =
@@ -125,7 +126,39 @@ let ``Async Recovery is tried maxRetries eventually fails when maxRetries reache
     }
     
     
-    
-    
+[<Fact>]
+let ``AsyncSeq windowed function works - Window size same as sequence size``() = 
+    let result = 
+        asyncSeq { 7; 5; 2; }
+        |> AsyncSeq.windowed 3 
+        |> AsyncSeq.toArraySynchronously
+
+    Assert.Equal<int array array>([| [| 7; 5; 2 |] |], result)
+
+[<Fact>]
+let ``AsyncSeq windowed function works - Empty sequence, empty result``() = 
+    let result = 
+        asyncSeq { }
+        |> AsyncSeq.windowed 3 
+        |> AsyncSeq.toArraySynchronously
+
+    Assert.Equal<int array>(Array.empty, result)
+
+[<Fact>]
+let ``AsyncSeq windowed function works - Large sequence, tail gets discarded``() = 
+    let result = 
+        asyncSeq { 7; 5; 2; 4; 6 }
+        |> AsyncSeq.windowed 3 
+        |> AsyncSeq.toArraySynchronously
+
+    let expected = 
+        [| 
+            [| 7; 5; 2 |]
+            [| 5; 2; 4 |]
+            [| 2; 4; 6 |] 
+        |]
+
+    Assert.Equal<int array>(expected, result)
+
 
 
