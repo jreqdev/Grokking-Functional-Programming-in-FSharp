@@ -222,13 +222,12 @@ module AsyncSeq =
 
                 // read from the sequence as many elements as needed to complete
                 // the current window
-
                 let! read = enumerator.MoveNext()
                 let mutable current = read
                 
                 while current.IsSome do
                     currentWindow.Add(current.Value)
-                    if(currentWindow.Count = windowSize)
+                    if currentWindow.Count = windowSize
                     then 
                         let resultWindow = currentWindow.ToArray()
                         yield resultWindow

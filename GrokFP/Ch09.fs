@@ -21,7 +21,7 @@ open System.Collections.Generic
 // but as long as it can be used to generate numbers it will still illustrate the important points.
 let exchangeRatesTableApiCall(currency: string) : IDictionary<string, decimal> = 
 
-    if Random.Shared.NextDouble() < 0.10
+    if Random.Shared.NextDouble() < 0.20
     then 
         let msg = "Connection error" 
         printfn "%s "msg
@@ -324,6 +324,16 @@ module SolvingCurrencyProblemWithStreams =
         |> AsyncSeq.map (fun last -> last * amount)
 
     
-
-
+    let exchangeIfTrendingWithDelayBetweenCalls(delayInMs: int, amount: decimal, from: Currency, ``to``: Currency) : AsyncSeq<decimal> = 
+        rates(from, ``to``)
+        |> AsyncSeq.zip (AsyncSeq.intervalMs delayInMs)
+        |> AsyncSeq.map (
+            fun (timestamp, rate) -> 
+                printfn $"[{timestamp}] {rate}"
+                rate)
+        |> AsyncSeq.windowed 3
+        |> AsyncSeq.filter trending
+        |> AsyncSeq.map Array.last
+        |> AsyncSeq.take 1
+        |> AsyncSeq.map (fun last -> last * amount)
 

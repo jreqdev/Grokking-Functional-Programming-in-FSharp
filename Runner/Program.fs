@@ -56,6 +56,6 @@ let eur = Currency "EUR"
 //rateList |> List.iteri (fun i elem -> printfn $"{i + 1} - {elem}")
 
 
-SolvingCurrencyProblemWithStreams.exchangeIfTrending (10m, usd, eur)
+SolvingCurrencyProblemWithStreams.exchangeIfTrendingWithDelayBetweenCalls (3000, 10m, usd, eur)
 |> AsyncSeq.toArraySynchronously
 |> printfn "%A"
