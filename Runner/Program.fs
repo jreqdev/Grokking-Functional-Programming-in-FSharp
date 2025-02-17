@@ -56,6 +56,37 @@ let eur = Currency "EUR"
 //rateList |> List.iteri (fun i elem -> printfn $"{i + 1} - {elem}")
 
 
-SolvingCurrencyProblemWithStreams.exchangeIfTrendingWithDelayBetweenCalls (3000, 10m, usd, eur)
-|> AsyncSeq.toArraySynchronously
-|> printfn "%A"
+//SolvingCurrencyProblemWithStreams.exchangeIfTrendingWithDelayBetweenCalls (60, 10m, usd, eur)
+//|> AsyncSeq.toArraySynchronously
+//|> printfn "%A"
+
+//GrokFP.Ch10.processCheckIns 3 GrokFP.Ch10.checkInValues |> Async.RunSynchronously
+
+//GrokFP.Ch10.processCheckIns 3 GrokFP.Ch10.extremeCheckInValues |> Async.RunSynchronously
+
+//GrokFP.Ch10.processCheckInsBatched 10_000 3 GrokFP.Ch10.extremeCheckInValues |> Async.RunSynchronously
+
+//use sw = new System.Diagnostics.Stopwatch()
+//sw.Start()
+//GrokFP.Ch10.PracticingConcurrentIOs.p5() |> Async.RunSynchronously |> printfn "%A"
+//sw.Stop()
+
+//printfn $"{sw.Elapsed.TotalSeconds}"
+
+//GrokFP.Ch10.PracticingConcurrentIOs.p4()
+//|> Async.RunSynchronously
+//|> printfn "%A"
+
+
+//GrokFP.Ch10.ConcurrentCheckIns.processCheckIns 
+//    GrokFP.Ch10.extremeCheckInValues
+//    //GrokFP.Ch10.checkInValues
+//|> Async.RunSynchronously
+
+//GrokFP.Ch10.AsynchronousAccess.checkInsClient 
+//    GrokFP.Ch10.extremeCheckInValues
+//|> Async.RunSynchronously
+
+GrokFP.Ch10.ProperDisposeAndCancellation.checkInsClient 
+    GrokFP.Ch10.extremeCheckInValues
+|> Async.RunSynchronously

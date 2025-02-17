@@ -10,6 +10,7 @@
     <Compile Include="Ch07_Tests.fs" />
     <Compile Include="Library_Tests.fs" />
     <Compile Include="Ch06_Tests.fs" />
+    <Compile Include="Ch10.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

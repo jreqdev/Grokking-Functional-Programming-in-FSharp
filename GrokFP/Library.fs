@@ -3,6 +3,8 @@
 open System.Runtime.CompilerServices
 open System.Collections.Generic
 
+let strJoin (sep: string) (values: string seq) = System.String.Join(sep, values)
+
 [<Extension>]
 type StringExtensions =
     [<Extension>]
@@ -244,3 +246,8 @@ module AsyncSeq =
             yield! yieldWindow enumerator [| |]
         }
         
+    ///<summary>
+  /// Yields all elements of the second asynchronous sequence and then
+  /// all elements of the first asynchronous sequence.
+  ///</summary>
+    let append2 seq1 seq2 = AsyncSeq.append seq2 seq1
